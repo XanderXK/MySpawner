@@ -3,26 +3,30 @@ using UnityEngine;
 
 public class MySpawner : MonoBehaviour
 {
-    private static Dictionary<string, List<GameObject>> spawnDict;
-    private static Transform spawnContainer;
+    private static Dictionary<string, Queue<GameObject>> _spawnDict;
+    private static Transform _spawnContainer;
 
 
     public static T Spawn<T>(T prefab, Vector3 position, Quaternion rotation) where T : Object
     {
-        if (spawnContainer == null)
+        if (_spawnContainer == null)
         {
-            spawnDict = new Dictionary<string, List<GameObject>>();
-            spawnContainer = new GameObject("SpawnContainer").transform;
+            _spawnDict = new Dictionary<string, Queue<GameObject>>();
+            _spawnContainer = new GameObject("SpawnContainer").transform;
         }
 
-        if (!spawnDict.ContainsKey(prefab.name))
+        if (!_spawnDict.ContainsKey(prefab.name))
         {
-            spawnDict.Add(prefab.name, new List<GameObject>());
+            _spawnDict.Add(prefab.name, new Queue<GameObject>());
         }
 
-        var itemList = spawnDict[prefab.name];
-        var currentItem = itemList.Find(item => !item.activeSelf && item.transform.parent == spawnContainer);
-        if (currentItem == null)
+        if (_spawnDict[prefab.name].TryDequeue(out var currentItem))
+        {
+            currentItem.transform.SetParent(null);
+            currentItem.transform.SetPositionAndRotation(position, rotation);
+            currentItem.SetActive(true);
+        }
+        else
         {
             if (prefab is GameObject prefabGameObject)
             {
@@ -32,14 +36,6 @@ public class MySpawner : MonoBehaviour
             {
                 currentItem = Instantiate((prefab as MonoBehaviour).gameObject, position, rotation);
             }
-
-            itemList.Add(currentItem);
-        }
-        else
-        {
-            currentItem.transform.SetPositionAndRotation(position, rotation);
-            currentItem.transform.SetParent(null);
-            currentItem.SetActive(true);
         }
 
         if (prefab is GameObject)
@@ -53,6 +49,7 @@ public class MySpawner : MonoBehaviour
     public static void Despawn(GameObject go)
     {
         go.SetActive(false);
-        go.transform.SetParent(spawnContainer);
+        go.transform.SetParent(_spawnContainer);
+        _spawnDict[go.name.Replace("(Clone)", string.Empty)].Enqueue(go);
     }
 }
